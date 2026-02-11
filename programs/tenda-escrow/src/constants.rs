@@ -32,7 +32,7 @@ pub const DEFAULT_GRACE_PERIOD: i64 = 86_400;
 pub const MAX_GIG_ID_LEN: usize = 36; // UUID length
 
 /// Maximum dispute reason length
-pub const MAX_DISPUTE_REASON_LEN: usize = 500;
+pub const MAX_DISPUTE_REASON_LEN: usize = 1000;
 
 // ==================== ACCOUNT SIZES ====================
 
