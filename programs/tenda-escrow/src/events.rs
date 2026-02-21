@@ -41,7 +41,8 @@ pub struct GigCreated {
     pub poster: Pubkey,
     pub payment_amount: u64,
     pub platform_fee: u64,
-    pub deadline: i64,
+    pub completion_duration_seconds: u64,
+    pub accept_deadline: Option<i64>,
     pub timestamp: i64,
 }
 
@@ -58,6 +59,7 @@ pub struct GigAccepted {
     pub gig_id: String,
     pub poster: Pubkey,
     pub worker: Pubkey,
+    pub completion_deadline: i64,
     pub timestamp: i64,
 }
 

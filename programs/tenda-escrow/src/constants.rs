@@ -31,6 +31,12 @@ pub const DEFAULT_GRACE_PERIOD: i64 = 86_400;
 /// Maximum gig ID length
 pub const MAX_GIG_ID_LEN: usize = 36; // UUID length
 
+/// Minimum completion duration: 1 hour in seconds
+pub const MIN_COMPLETION_DURATION_SECONDS: u64 = 3_600;
+
+/// Maximum completion duration: 90 days in seconds
+pub const MAX_COMPLETION_DURATION_SECONDS: u64 = 90 * 24 * 3_600;
+
 /// Maximum dispute reason length
 pub const MAX_DISPUTE_REASON_LEN: usize = 1000;
 

@@ -34,9 +34,9 @@ pub fn handler(
     ctx: Context<CreateGigEscrow>,
     gig_id: String,
     payment_amount: u64,
-    deadline: i64,
+    completion_duration_seconds: u64,
+    accept_deadline: Option<i64>,
 ) -> Result<()> {
-    // Validate inputs
     require!(
         gig_id.len() <= MAX_GIG_ID_LEN,
         TendaError::GigIdTooLong
@@ -47,13 +47,25 @@ pub fn handler(
         TendaError::PaymentTooLow
     );
 
-    let current_time = utils::current_timestamp()?;
     require!(
-        deadline > current_time,
-        TendaError::InvalidDeadline
+        completion_duration_seconds >= MIN_COMPLETION_DURATION_SECONDS,
+        TendaError::DurationTooShort
     );
 
-    // Calculate platform fee
+    require!(
+        completion_duration_seconds <= MAX_COMPLETION_DURATION_SECONDS,
+        TendaError::DurationTooLong
+    );
+
+    let current_time = utils::current_timestamp()?;
+
+    if let Some(deadline) = accept_deadline {
+        require!(
+            deadline > current_time,
+            TendaError::InvalidDeadline
+        );
+    }
+
     let platform_fee = utils::calculate_platform_fee(
         payment_amount,
         ctx.accounts.platform_state.platform_fee_bps,
@@ -63,7 +75,6 @@ pub fn handler(
         .checked_add(platform_fee)
         .ok_or(TendaError::ArithmeticOverflow)?;
 
-    // Transfer SOL from poster to escrow PDA
     utils::transfer_sol(
         &ctx.accounts.poster.to_account_info(),
         &ctx.accounts.gig_escrow.to_account_info(),
@@ -71,23 +82,23 @@ pub fn handler(
         &ctx.accounts.system_program.to_account_info(),
     )?;
 
-    // Initialize escrow account
     let gig_escrow = &mut ctx.accounts.gig_escrow;
-    gig_escrow.gig_id = gig_id.clone();
-    gig_escrow.poster = ctx.accounts.poster.key();
-    gig_escrow.worker = None;
-    gig_escrow.payment_amount = payment_amount;
-    gig_escrow.platform_fee = platform_fee;
-    gig_escrow.total_locked = total_locked;
-    gig_escrow.created_at = current_time;
-    gig_escrow.deadline = deadline;
-    gig_escrow.accepted_at = None;
-    gig_escrow.submitted_at = None;
-    gig_escrow.completed_at = None;
-    gig_escrow.status = GigStatus::Open;
-    gig_escrow.bump = ctx.bumps.gig_escrow;
+    gig_escrow.gig_id                    = gig_id.clone();
+    gig_escrow.poster                    = ctx.accounts.poster.key();
+    gig_escrow.worker                    = None;
+    gig_escrow.payment_amount            = payment_amount;
+    gig_escrow.platform_fee              = platform_fee;
+    gig_escrow.total_locked              = total_locked;
+    gig_escrow.accept_deadline           = accept_deadline;
+    gig_escrow.completion_duration_seconds = completion_duration_seconds;
+    gig_escrow.completion_deadline       = None; // set at acceptance
+    gig_escrow.created_at                = current_time;
+    gig_escrow.accepted_at               = None;
+    gig_escrow.submitted_at              = None;
+    gig_escrow.completed_at              = None;
+    gig_escrow.status                    = GigStatus::Open;
+    gig_escrow.bump                      = ctx.bumps.gig_escrow;
 
-    // Update platform stats
     let platform_state = &mut ctx.accounts.platform_state;
     platform_state.total_gigs = platform_state.total_gigs
         .checked_add(1)
@@ -98,13 +109,15 @@ pub fn handler(
         poster: ctx.accounts.poster.key(),
         payment_amount,
         platform_fee,
-        deadline,
+        completion_duration_seconds,
+        accept_deadline,
         timestamp: current_time,
     });
 
     msg!(
-        "Gig created with {} lamports locked in escrow",
-        total_locked
+        "Gig escrow created: {} lamports locked, {} seconds to complete after acceptance",
+        total_locked,
+        completion_duration_seconds,
     );
 
     Ok(())

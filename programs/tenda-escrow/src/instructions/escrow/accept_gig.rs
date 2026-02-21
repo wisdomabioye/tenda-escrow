@@ -27,34 +27,49 @@ pub struct AcceptGig<'info> {
 pub fn handler(ctx: Context<AcceptGig>) -> Result<()> {
     let gig_escrow = &mut ctx.accounts.gig_escrow;
 
-    // Check gig status
     require!(
         gig_escrow.status.can_accept(),
         TendaError::InvalidGigStatus
     );
 
-    // Cannot accept own gig
     require!(
         !gig_escrow.is_poster(&ctx.accounts.worker.key()),
         TendaError::CannotAcceptOwnGig
     );
 
-    // Update escrow
-    gig_escrow.worker = Some(ctx.accounts.worker.key());
-    gig_escrow.accepted_at = Some(utils::current_timestamp()?);
-    gig_escrow.status = GigStatus::Accepted;
+    let current_time = utils::current_timestamp()?;
+
+    // Enforce accept_deadline if set
+    if let Some(deadline) = gig_escrow.accept_deadline {
+        require!(
+            current_time <= deadline,
+            TendaError::AcceptDeadlinePassed
+        );
+    }
+
+    // Compute completion_deadline = now + duration
+    let completion_deadline = current_time
+        .checked_add(gig_escrow.completion_duration_seconds as i64)
+        .ok_or(TendaError::ArithmeticOverflow)?;
+
+    gig_escrow.worker               = Some(ctx.accounts.worker.key());
+    gig_escrow.accepted_at          = Some(current_time);
+    gig_escrow.completion_deadline  = Some(completion_deadline);
+    gig_escrow.status               = GigStatus::Accepted;
 
     emit!(GigAccepted {
         gig_id: gig_escrow.gig_id.clone(),
         poster: gig_escrow.poster,
         worker: ctx.accounts.worker.key(),
-        timestamp: gig_escrow.accepted_at.unwrap(),
+        completion_deadline,
+        timestamp: current_time,
     });
 
     msg!(
-        "Gig {} accepted by worker {}",
+        "Gig {} accepted by {}, must complete by {}",
         gig_escrow.gig_id,
-        ctx.accounts.worker.key()
+        ctx.accounts.worker.key(),
+        completion_deadline,
     );
 
     Ok(())

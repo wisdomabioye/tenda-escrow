@@ -38,6 +38,15 @@ pub enum TendaError {
     #[msg("Deadline must be in the future")]
     InvalidDeadline,
 
+    #[msg("Accept deadline has passed")]
+    AcceptDeadlinePassed,
+
+    #[msg("Completion duration is below minimum allowed")]
+    DurationTooShort,
+
+    #[msg("Completion duration exceeds maximum allowed")]
+    DurationTooLong,
+
     #[msg("Gig ID is too long")]
     GigIdTooLong,
 

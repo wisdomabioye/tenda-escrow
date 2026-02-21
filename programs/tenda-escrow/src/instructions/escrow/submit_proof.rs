@@ -27,30 +27,30 @@ pub struct SubmitProof<'info> {
 pub fn handler(ctx: Context<SubmitProof>) -> Result<()> {
     let gig_escrow = &mut ctx.accounts.gig_escrow;
 
-    // Only worker can submit proof
     require!(
         gig_escrow.is_worker(&ctx.accounts.worker.key()),
         TendaError::NotWorker
     );
 
-    // Check status
     require!(
         gig_escrow.status.can_submit(),
         TendaError::InvalidGigStatus
     );
 
-    // Check if within submission window (deadline + grace period)
+    // completion_deadline is always Some once accepted — safe to unwrap
+    let completion_deadline = gig_escrow.completion_deadline
+        .ok_or(TendaError::InvalidGigStatus)?;
+
     let current_time = utils::current_timestamp()?;
     let grace_period = ctx.accounts.platform_state.grace_period_seconds;
-    
+
     require!(
-        current_time <= gig_escrow.deadline + grace_period,
+        current_time <= completion_deadline + grace_period,
         TendaError::SubmissionDeadlinePassed
     );
 
-    // Update escrow
     gig_escrow.submitted_at = Some(current_time);
-    gig_escrow.status = GigStatus::Submitted;
+    gig_escrow.status       = GigStatus::Submitted;
 
     emit!(ProofSubmitted {
         gig_id: gig_escrow.gig_id.clone(),

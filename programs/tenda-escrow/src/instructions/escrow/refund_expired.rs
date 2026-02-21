@@ -33,23 +33,22 @@ pub struct RefundExpired<'info> {
 
 pub fn handler(ctx: Context<RefundExpired>) -> Result<()> {
     let gig_escrow = &ctx.accounts.gig_escrow;
+    let current_time = utils::current_timestamp()?;
+    let grace_period = ctx.accounts.platform_state.grace_period_seconds;
 
-    // Check if gig can be refunded (Open or Accepted status only)
     require!(
         gig_escrow.status.can_refund(),
         TendaError::InvalidGigStatus
     );
 
-    // Cannot refund if proof has been submitted
     require!(
         gig_escrow.submitted_at.is_none(),
         TendaError::CannotRefundWithProof
     );
 
-    // Check if grace period has passed
-    let current_time = utils::current_timestamp()?;
-    let grace_period = ctx.accounts.platform_state.grace_period_seconds;
-    
+    // Expiry check depends on status:
+    // - Open: refundable if accept_deadline is set and has passed
+    // - Accepted: refundable if completion_deadline + grace_period has passed
     require!(
         gig_escrow.is_expired(current_time, grace_period),
         TendaError::GigNotExpired
@@ -57,7 +56,6 @@ pub fn handler(ctx: Context<RefundExpired>) -> Result<()> {
 
     let refund_amount = gig_escrow.total_locked;
 
-    // Refund locked SOL to poster
     **ctx.accounts.gig_escrow.to_account_info().try_borrow_mut_lamports()? -= refund_amount;
     **ctx.accounts.poster.try_borrow_mut_lamports()? += refund_amount;
 
@@ -74,6 +72,5 @@ pub fn handler(ctx: Context<RefundExpired>) -> Result<()> {
         refund_amount
     );
 
-    // Account closure handled automatically by Anchor
     Ok(())
 }

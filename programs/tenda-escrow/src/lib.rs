@@ -51,9 +51,16 @@ pub mod tenda_escrow {
         ctx: Context<CreateGigEscrow>,
         gig_id: String,
         payment_amount: u64,
-        deadline: i64,
+        completion_duration_seconds: u64,
+        accept_deadline: Option<i64>,
     ) -> Result<()> {
-        instructions::escrow::create_gig_escrow::handler(ctx, gig_id, payment_amount, deadline)
+        instructions::escrow::create_gig_escrow::handler(
+            ctx,
+            gig_id,
+            payment_amount,
+            completion_duration_seconds,
+            accept_deadline,
+        )
     }
 
     pub fn cancel_gig(ctx: Context<CancelGig>) -> Result<()> {

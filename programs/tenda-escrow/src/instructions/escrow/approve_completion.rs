@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use crate::constants::*;
 use crate::errors::TendaError;
 use crate::events::GigCompleted;
-use crate::state::{GigEscrow, GigStatus, PlatformState, UserAccount};
+use crate::state::{GigEscrow, PlatformState, UserAccount};
 use crate::utils;
 
 #[derive(Accounts)]
