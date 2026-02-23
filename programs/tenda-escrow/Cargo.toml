@@ -1,12 +1,12 @@
 [package]
-name = "tenda"
+name = "tenda_escrow"
 version = "0.1.0"
 description = "Tenda Escrow Smart Contract"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "tenda"
+name = "tenda_escrow"
 
 [features]
 default = []

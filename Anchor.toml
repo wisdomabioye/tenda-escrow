@@ -6,13 +6,16 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-escrow = "3TkwK7apwhGxbKZfxnacqJejJdFS5YBzYiLYJnVQ1W7T"
+tenda_escrow = "7H6AAoghUCPAVA1WTEwpSmkiRfPHWrgFidZQPzbXzkes"
+
+[programs.devnet]
+tenda_escrow = "7H6AAoghUCPAVA1WTEwpSmkiRfPHWrgFidZQPzbXzkes"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

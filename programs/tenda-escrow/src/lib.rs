@@ -9,7 +9,7 @@ pub mod utils;
 
 use instructions::*;
 
-declare_id!("TendaEscrowProgram1111111111111111111111111");
+declare_id!("7H6AAoghUCPAVA1WTEwpSmkiRfPHWrgFidZQPzbXzkes");
 
 #[program]
 pub mod tenda_escrow {

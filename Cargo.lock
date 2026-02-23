@@ -1328,7 +1328,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tenda"
+name = "tenda_escrow"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
