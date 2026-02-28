@@ -5,6 +5,7 @@ pub mod submit_proof;
 pub mod approve_completion;
 pub mod refund_expired;
 
+#[allow(ambiguous_glob_reexports)]
 pub use create_gig_escrow::*;
 pub use cancel_gig::*;
 pub use accept_gig::*;
