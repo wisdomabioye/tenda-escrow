@@ -60,7 +60,7 @@ pub struct GigEscrow {
 
 impl GigEscrow {
     pub const LEN: usize = 8 +          // discriminator
-        (4 + 36) +                      // gig_id (String, max 36 chars for UUID)
+        (4 + 32) +                      // gig_id (String, max 32 chars — UUID without hyphens)
         32 +                            // poster
         (1 + 32) +                      // worker (Option<Pubkey>)
         8 +                             // payment_amount

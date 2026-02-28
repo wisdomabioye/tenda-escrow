@@ -91,15 +91,22 @@ pub fn handler(ctx: Context<ResolveDispute>, winner: DisputeWinner) -> Result<()
             (0, payment_amount)
         }
         DisputeWinner::Poster => {
-            // Poster wins - full refund (payment + fee)
-            let refund = payment_amount + platform_fee;
-            **ctx.accounts.gig_escrow.to_account_info().try_borrow_mut_lamports()? -= refund;
-            **ctx.accounts.poster.try_borrow_mut_lamports()? += refund;
+            // Poster wins - payment refunded; platform keeps the fee.
+            // The platform provided a real service (escrow, marketplace, dispute resolution)
+            // regardless of outcome. Keeping the fee in all three outcomes also makes the
+            // admin financially indifferent between winner choices, removing any incentive
+            // to favour the worker.
+            **ctx.accounts.gig_escrow.to_account_info().try_borrow_mut_lamports()? -= payment_amount;
+            **ctx.accounts.poster.try_borrow_mut_lamports()? += payment_amount;
 
-            (refund, 0)
+            **ctx.accounts.gig_escrow.to_account_info().try_borrow_mut_lamports()? -= platform_fee;
+            **ctx.accounts.treasury.try_borrow_mut_lamports()? += platform_fee;
+
+            (payment_amount, 0)
         }
         DisputeWinner::Split => {
-            // 50/50 split of payment, platform keeps fee
+            // 50/50 split of payment, platform keeps fee.
+            // If payment_amount is odd, the remainder (1 lamport) goes to poster via `close = poster`.
             let half_payment = payment_amount / 2;
 
             **ctx.accounts.gig_escrow.to_account_info().try_borrow_mut_lamports()? -= half_payment;

@@ -23,22 +23,18 @@ pub struct WithdrawEarnings<'info> {
 pub fn handler(ctx: Context<WithdrawEarnings>, amount: u64) -> Result<()> {
     let user_account = &mut ctx.accounts.user_account;
 
-    // Calculate withdrawable balance
-    let withdrawable = user_account.withdrawable_balance();
+    // Airdrop is only unlocked after completing at least 1 gig
+    require!(
+        user_account.has_completed_gig(),
+        TendaError::AirdropStillLocked
+    );
 
-    // Check if user has sufficient balance
+    // Check if user has sufficient airdrop balance
+    let withdrawable = user_account.withdrawable_balance();
     require!(
         amount <= withdrawable,
         TendaError::InsufficientBalance
     );
-
-    // Check if airdrop is unlocked (if trying to withdraw more than earned_sol)
-    if amount > user_account.earned_sol {
-        require!(
-            user_account.has_completed_gig(),
-            TendaError::AirdropStillLocked
-        );
-    }
 
     // Deduct from user account
     user_account.deduct_withdrawal(amount)?;

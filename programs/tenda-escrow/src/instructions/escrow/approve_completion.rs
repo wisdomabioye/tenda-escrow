@@ -86,9 +86,7 @@ pub fn handler(ctx: Context<ApproveCompletion>) -> Result<()> {
 
     // Update platform stats
     let platform_state = &mut ctx.accounts.platform_state;
-    platform_state.total_volume = platform_state.total_volume
-        .checked_add(payment_amount)
-        .ok_or(TendaError::ArithmeticOverflow)?;
+    platform_state.total_volume = platform_state.total_volume.saturating_add(payment_amount);
 
     emit!(GigCompleted {
         gig_id: gig_escrow.gig_id.clone(),

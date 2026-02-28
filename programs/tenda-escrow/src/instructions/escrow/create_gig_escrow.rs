@@ -100,9 +100,7 @@ pub fn handler(
     gig_escrow.bump                      = ctx.bumps.gig_escrow;
 
     let platform_state = &mut ctx.accounts.platform_state;
-    platform_state.total_gigs = platform_state.total_gigs
-        .checked_add(1)
-        .ok_or(TendaError::ArithmeticOverflow)?;
+    platform_state.total_gigs = platform_state.total_gigs.saturating_add(1);
 
     emit!(GigCreated {
         gig_id,

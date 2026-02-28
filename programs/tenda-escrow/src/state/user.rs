@@ -8,7 +8,7 @@ pub struct UserAccount {
     /// Locked airdrop SOL (unlocks after 1 completed gig)
     pub airdrop_sol: u64,
     
-    /// Withdrawable earned SOL
+    /// Lifetime earnings tracker (paid directly to wallet on gig completion — not held here)
     pub earned_sol: u64,
     
     /// Total completed gigs
@@ -30,14 +30,15 @@ impl UserAccount {
         1 +     // phone_verified
         8;      // created_at
 
-    /// Calculate total withdrawable balance
+    /// Calculate total withdrawable balance.
+    /// earned_sol is tracking-only (paid directly to wallet on approval).
+    /// Only airdrop_sol is held in this PDA and withdrawable here.
     pub fn withdrawable_balance(&self) -> u64 {
         if self.completed_gigs >= 1 {
             // Airdrop unlocked after 1 completed gig
-            self.earned_sol.saturating_add(self.airdrop_sol)
+            self.airdrop_sol
         } else {
-            // Airdrop still locked
-            self.earned_sol
+            0
         }
     }
 
@@ -59,21 +60,12 @@ impl UserAccount {
         Ok(())
     }
 
-    /// Deduct from withdrawable balance (earned first, then airdrop)
+    /// Deduct from airdrop_sol (the only lamports held in this PDA).
+    /// earned_sol is tracking-only and is never deducted here.
     pub fn deduct_withdrawal(&mut self, amount: u64) -> Result<()> {
-        if amount <= self.earned_sol {
-            // Deduct from earned only
-            self.earned_sol = self.earned_sol
-                .checked_sub(amount)
-                .ok_or(error!(crate::errors::TendaError::ArithmeticUnderflow))?;
-        } else {
-            // Deduct from earned + airdrop
-            let from_airdrop = amount - self.earned_sol;
-            self.earned_sol = 0;
-            self.airdrop_sol = self.airdrop_sol
-                .checked_sub(from_airdrop)
-                .ok_or(error!(crate::errors::TendaError::ArithmeticUnderflow))?;
-        }
+        self.airdrop_sol = self.airdrop_sol
+            .checked_sub(amount)
+            .ok_or(error!(crate::errors::TendaError::ArithmeticUnderflow))?;
         Ok(())
     }
 }

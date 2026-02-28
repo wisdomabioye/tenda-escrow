@@ -28,8 +28,8 @@ pub const DEFAULT_GAS_SUBSIDY: u64 = 5_000_000;
 /// Default grace period (24 hours = 86400 seconds)
 pub const DEFAULT_GRACE_PERIOD: i64 = 86_400;
 
-/// Maximum gig ID length
-pub const MAX_GIG_ID_LEN: usize = 36; // UUID length
+/// Maximum gig ID length (UUID without hyphens — 32 hex chars = 32 bytes, fits Solana seed limit)
+pub const MAX_GIG_ID_LEN: usize = 32;
 
 /// Minimum completion duration: 1 hour in seconds
 pub const MIN_COMPLETION_DURATION_SECONDS: u64 = 3_600;
@@ -50,6 +50,3 @@ pub const PLATFORM_STATE_SIZE: usize = 8 + 32 + 2 + 32 + 8 + 8 + 8;
 /// 8 (discriminator) + 32 (wallet) + 8 (airdrop_sol) + 8 (earned_sol) + 4 (completed_gigs) + 1 (phone_verified) + 8 (created_at)
 pub const USER_ACCOUNT_SIZE: usize = 8 + 32 + 8 + 8 + 4 + 1 + 8;
 
-/// GigEscrow size
-/// 8 (discriminator) + 40 (gig_id string) + 32 (poster) + 33 (Option<worker>) + 8*3 (amounts) + 8*5 (timestamps) + 1 (status) + 1 (bump)
-pub const GIG_ESCROW_SIZE: usize = 8 + 40 + 32 + 33 + 24 + 40 + 1 + 1;
