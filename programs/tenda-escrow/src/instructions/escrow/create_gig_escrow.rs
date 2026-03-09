@@ -36,6 +36,7 @@ pub fn handler(
     payment_amount: u64,
     completion_duration_seconds: u64,
     accept_deadline: Option<i64>,
+    is_seeker: bool,
 ) -> Result<()> {
     require!(
         gig_id.len() <= MAX_GIG_ID_LEN,
@@ -66,10 +67,8 @@ pub fn handler(
         );
     }
 
-    let platform_fee = utils::calculate_platform_fee(
-        payment_amount,
-        ctx.accounts.platform_state.platform_fee_bps,
-    )?;
+    let effective_fee_bps = ctx.accounts.platform_state.effective_fee_bps(is_seeker);
+    let platform_fee = utils::calculate_platform_fee(payment_amount, effective_fee_bps)?;
 
     let total_locked = payment_amount
         .checked_add(platform_fee)

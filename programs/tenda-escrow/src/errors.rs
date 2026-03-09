@@ -7,6 +7,9 @@ pub enum TendaError {
     #[msg("Platform fee exceeds maximum allowed (5%)")]
     PlatformFeeTooHigh,
 
+    #[msg("Seeker fee must not exceed the standard platform fee")]
+    SeekerFeeExceedsStandardFee,
+
     #[msg("Platform is already initialized")]
     PlatformAlreadyInitialized,
 

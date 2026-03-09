@@ -19,6 +19,9 @@ pub const MIN_PAYMENT: u64 = 1_000_000;
 /// Maximum platform fee (5% = 500 basis points)
 pub const MAX_PLATFORM_FEE_BPS: u16 = 500;
 
+/// Default Seeker fee discount (1% = 100 basis points)
+pub const DEFAULT_SEEKER_FEE_BPS: u16 = 100;
+
 /// Maximum airdrop amount (0.01 SOL = 10,000,000 lamports)
 pub const MAX_AIRDROP: u64 = 10_000_000;
 
@@ -43,8 +46,8 @@ pub const MAX_DISPUTE_REASON_LEN: usize = 1000;
 // ==================== ACCOUNT SIZES ====================
 
 /// PlatformState account size
-/// 8 (discriminator) + 32 (admin) + 2 (fee_bps) + 32 (treasury) + 8 (total_gigs) + 8 (total_volume) + 8 (grace_period)
-pub const PLATFORM_STATE_SIZE: usize = 8 + 32 + 2 + 32 + 8 + 8 + 8;
+/// 8 (discriminator) + 32 (admin) + 2 (fee_bps) + 2 (seeker_fee_bps) + 32 (treasury) + 8 (total_gigs) + 8 (total_volume) + 8 (grace_period)
+pub const PLATFORM_STATE_SIZE: usize = 8 + 32 + 2 + 2 + 32 + 8 + 8 + 8;
 
 /// UserAccount size
 /// 8 (discriminator) + 32 (wallet) + 8 (airdrop_sol) + 8 (earned_sol) + 4 (completed_gigs) + 1 (phone_verified) + 8 (created_at)

@@ -6,6 +6,7 @@ use anchor_lang::prelude::*;
 pub struct PlatformInitialized {
     pub admin: Pubkey,
     pub platform_fee_bps: u16,
+    pub seeker_fee_bps: u16,
     pub grace_period_seconds: i64,
     pub timestamp: i64,
 }

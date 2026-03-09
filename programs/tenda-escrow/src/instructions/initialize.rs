@@ -28,31 +28,37 @@ pub struct InitializePlatform<'info> {
 pub fn handler(
     ctx: Context<InitializePlatform>,
     platform_fee_bps: u16,
+    seeker_fee_bps: u16,
     grace_period_seconds: i64,
 ) -> Result<()> {
-    // Validate platform fee
     require!(
         platform_fee_bps <= MAX_PLATFORM_FEE_BPS,
         TendaError::PlatformFeeTooHigh
     );
+    require!(
+        seeker_fee_bps <= platform_fee_bps,
+        TendaError::SeekerFeeExceedsStandardFee
+    );
 
     let platform_state = &mut ctx.accounts.platform_state;
 
-    platform_state.admin = ctx.accounts.admin.key();
-    platform_state.platform_fee_bps = platform_fee_bps;
-    platform_state.treasury = ctx.accounts.treasury.key();
-    platform_state.total_gigs = 0;
-    platform_state.total_volume = 0;
+    platform_state.admin              = ctx.accounts.admin.key();
+    platform_state.platform_fee_bps   = platform_fee_bps;
+    platform_state.seeker_fee_bps     = seeker_fee_bps;
+    platform_state.treasury           = ctx.accounts.treasury.key();
+    platform_state.total_gigs         = 0;
+    platform_state.total_volume       = 0;
     platform_state.grace_period_seconds = grace_period_seconds;
 
     emit!(PlatformInitialized {
         admin: ctx.accounts.admin.key(),
         platform_fee_bps,
+        seeker_fee_bps,
         grace_period_seconds,
         timestamp: utils::current_timestamp()?,
     });
 
-    msg!("Platform initialized with fee: {} bps", platform_fee_bps);
+    msg!("Platform initialized with fee: {} bps, seeker fee: {} bps", platform_fee_bps, seeker_fee_bps);
 
     Ok(())
 }

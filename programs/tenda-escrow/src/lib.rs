@@ -20,9 +20,10 @@ pub mod tenda_escrow {
     pub fn initialize_platform(
         ctx: Context<InitializePlatform>,
         platform_fee_bps: u16,
+        seeker_fee_bps: u16,
         grace_period_seconds: i64,
     ) -> Result<()> {
-        instructions::initialize::handler(ctx, platform_fee_bps, grace_period_seconds)
+        instructions::initialize::handler(ctx, platform_fee_bps, seeker_fee_bps, grace_period_seconds)
     }
 
     // ==================== USER MANAGEMENT ====================
@@ -53,6 +54,7 @@ pub mod tenda_escrow {
         payment_amount: u64,
         completion_duration_seconds: u64,
         accept_deadline: Option<i64>,
+        is_seeker: bool,
     ) -> Result<()> {
         instructions::escrow::create_gig_escrow::handler(
             ctx,
@@ -60,6 +62,7 @@ pub mod tenda_escrow {
             payment_amount,
             completion_duration_seconds,
             accept_deadline,
+            is_seeker,
         )
     }
 
