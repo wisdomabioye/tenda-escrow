@@ -39,6 +39,16 @@ pub mod tenda_escrow {
         instructions::user::airdrop_gas_subsidy::handler(ctx, amount)
     }
 
+    /// Distribute gas-subsidy airdrops to multiple recipients in a single transaction.
+    /// remaining_accounts layout: [treasury, system_program, pda_0, wallet_0, ..., pda_n, wallet_n].
+    /// `amounts[i]` maps to the [pda_i, wallet_i] pair at index 2+i*2.
+    pub fn batch_airdrop_gas_subsidy(
+        ctx: Context<BatchAirdropGasSubsidy>,
+        amounts: Vec<u64>,
+    ) -> Result<()> {
+        instructions::user::batch_airdrop_gas_subsidy::handler(ctx, amounts)
+    }
+
     pub fn withdraw_earnings(
         ctx: Context<WithdrawEarnings>,
         amount: u64,

@@ -33,6 +33,30 @@ pub enum TendaError {
     #[msg("User account does not exist")]
     UserAccountNotFound,
 
+    #[msg("Batch must contain at least one recipient")]
+    EmptyBatch,
+
+    #[msg("Remaining accounts length must equal 2 × number of amounts")]
+    InvalidBatchLength,
+
+    #[msg("User account PDA does not match expected derivation for this wallet")]
+    InvalidUserAccount,
+
+    #[msg("Treasury account must be a signer")]
+    TreasuryMustSign,
+
+    #[msg("Account must be writable")]
+    AccountNotWritable,
+
+    #[msg("System program account is invalid")]
+    InvalidSystemProgram,
+
+    #[msg("Treasury has insufficient balance for this batch")]
+    InsufficientTreasuryBalance,
+
+    #[msg("Recipient wallet must be a system-owned account")]
+    InvalidRecipient,
+
     // ==================== ESCROW ERRORS ====================
     
     #[msg("Payment amount below minimum")]
