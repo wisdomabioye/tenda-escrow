@@ -174,7 +174,9 @@ describe("devnet E2E (deployed program)", function () {
       .rpc();
 
     const esc = await ctx.program.account.escrow.fetch(e.escrow);
-    assert.equal(enumKey(esc.status), "expired");
+    // refund_expired.rs sets Refunded (the EXPIRED concept lives on the
+    // server's lazy-expiry state machine, not on-chain).
+    assert.equal(enumKey(esc.status), "refunded");
     const creatorAfter = await ctx.connection.getBalance(ctx.creator.publicKey);
     // Refund minus the signature fee the creator paid for this tx.
     assert.ok(creatorAfter > creatorBefore);
