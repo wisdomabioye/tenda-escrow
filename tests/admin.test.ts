@@ -16,6 +16,7 @@ import {
   initPlatform,
   newCtx,
   platformArgs,
+  warpBy,
   sendIxs,
   expectEvent,
 } from "./helpers";
@@ -292,5 +293,76 @@ describe("admin", () => {
         "GracePeriodOutOfRange"
       );
     });
+  });
+});
+
+describe("close_legacy_platform (devnet migration path)", () => {
+  let ctx: TestCtx;
+
+  beforeEach(() => {
+    ctx = newCtx();
+  });
+
+  /** Forge the pre-rewrite artifact: an 88-byte program-owned account at the platform PDA. */
+  function plantLegacyPlatform(): void {
+    ctx.svm.setAccount(ctx.platformPda, {
+      lamports: Number(ctx.svm.minimumBalanceForRentExemption(88n)),
+      data: new Uint8Array(88),
+      owner: ctx.program.programId,
+      executable: false,
+    });
+  }
+
+  it("closes a legacy-sized platform account and lets initialize_platform re-create it", async () => {
+    plantLegacyPlatform();
+
+    // Sanity: init against the stale account fails (PDA already exists).
+    await expectFailure(initPlatform(ctx));
+
+    await ctx.program.methods
+      .closeLegacyPlatform()
+      .accountsPartial({
+        platformRaw: ctx.platformPda,
+        payer: ctx.payer.publicKey,
+      })
+      .rpc();
+
+    // Account is gone — init now succeeds and decodes as current layout.
+    // (warpBy expires the blockhash so this init doesn't dedupe against
+    // the failed attempt above — see helpers.ts design notes.)
+    assert.isNull(ctx.svm.getAccount(ctx.platformPda));
+    warpBy(ctx, 1);
+    await initPlatform(ctx);
+    const state = await ctx.program.account.platformState.fetch(ctx.platformPda);
+    assert.equal(state.feeBps, PLATFORM_DEFAULTS.feeBps);
+  });
+
+  it("refuses to close a current-layout platform regardless of signer", async () => {
+    await initPlatform(ctx);
+    await expectTendaError(
+      ctx.program.methods
+        .closeLegacyPlatform()
+        .accountsPartial({
+          platformRaw: ctx.platformPda,
+          payer: ctx.payer.publicKey,
+        })
+        .rpc(),
+      "PlatformLayoutCurrent"
+    );
+    // Platform untouched.
+    const state = await ctx.program.account.platformState.fetch(ctx.platformPda);
+    assert.equal(state.feeBps, PLATFORM_DEFAULTS.feeBps);
+  });
+
+  it("refuses when the PDA does not exist at all (system-owned/empty)", async () => {
+    await expectFailure(
+      ctx.program.methods
+        .closeLegacyPlatform()
+        .accountsPartial({
+          platformRaw: ctx.platformPda,
+          payer: ctx.payer.publicKey,
+        })
+        .rpc()
+    );
   });
 });

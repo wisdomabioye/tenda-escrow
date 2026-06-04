@@ -112,4 +112,7 @@ pub enum TendaError {
 
     #[msg("SOL escrow amount below the vault rent-exempt minimum")]
     AmountBelowVaultRentMinimum,
+
+    #[msg("platform account already uses the current layout — nothing legacy to close")]
+    PlatformLayoutCurrent,
 }

@@ -221,7 +221,19 @@ export const PLATFORM_DEFAULTS = {
 
 export async function ensurePlatform(ctx: DevnetCtx): Promise<void> {
   const existing = await ctx.connection.getAccountInfo(ctx.platformPda);
-  if (existing !== null) return; // initialized on a previous run
+  if (existing !== null) {
+    // PlatformState::LEN — a pre-rewrite deployment at the same program id
+    // leaves a smaller legacy account behind; close it so init can run.
+    const CURRENT_LEN = 8 + 32 * 3 + 2 * 2 + 8 * 3 + 1;
+    if (existing.data.length === CURRENT_LEN) return; // initialized + current
+    await ctx.program.methods
+      .closeLegacyPlatform()
+      .accountsPartial({
+        platformRaw: ctx.platformPda,
+        payer: ctx.payer.publicKey,
+      })
+      .rpc();
+  }
   await ctx.program.methods
     .initializePlatform({
       protocolAdmin: ctx.protocolAdmin.publicKey,

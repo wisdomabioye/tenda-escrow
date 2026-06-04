@@ -8,6 +8,7 @@
 //! `PlatformConfigChanged` events fire on every mutation so the off-chain
 //! listener can mirror parameter changes into the `platform_config` table.
 
+pub mod close_legacy_platform;
 pub mod initialize_platform;
 pub mod set_approval_window;
 pub mod set_dispute_admin;
@@ -21,6 +22,7 @@ pub mod set_treasury;
 // `lib.rs::*` → `instructions::*` → `instructions::admin::*` →
 // `instructions::admin::<name>::*`). Each submodule's public fn is named
 // `<name>_handler` so the globs do not collide.
+pub use close_legacy_platform::*;
 pub use initialize_platform::*;
 pub use set_approval_window::*;
 pub use set_dispute_admin::*;

@@ -71,6 +71,13 @@ pub mod tenda_escrow {
         initialize_platform_handler(ctx, args)
     }
 
+    /// Devnet migration: close a stale pre-rewrite platform PDA so
+    /// `initialize_platform` can re-create it. Permanent no-op against a
+    /// current-layout platform (see instruction docs).
+    pub fn close_legacy_platform(ctx: Context<CloseLegacyPlatform>) -> Result<()> {
+        close_legacy_platform_handler(ctx)
+    }
+
     pub fn set_protocol_admin(ctx: Context<AdminUpdate>, new_admin: Pubkey) -> Result<()> {
         set_protocol_admin_handler(ctx, new_admin)
     }
