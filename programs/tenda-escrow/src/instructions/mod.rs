@@ -1,10 +1,8 @@
-pub mod initialize;
-pub mod user;
-pub mod escrow;
-pub mod dispute;
+//! Instruction handlers. Each submodule owns one on-chain entrypoint plus its
+//! `#[derive(Accounts)]` struct. `lib.rs` re-exports the entrypoint fns.
 
-#[allow(ambiguous_glob_reexports)]
-pub use initialize::*;
-pub use user::*;
-pub use escrow::*;
-pub use dispute::*;
+pub mod admin;
+pub mod dispute;
+pub mod escrow_create;
+pub mod escrow_state;
+pub mod vault;

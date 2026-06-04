@@ -1,137 +1,115 @@
 use anchor_lang::prelude::*;
 
+/// Error surface for the rewritten escrow program. Codes are stable — adding
+/// new errors at the end of the enum keeps existing on-chain decodings
+/// unchanged.
 #[error_code]
 pub enum TendaError {
-    // ==================== PLATFORM ERRORS ====================
-    
-    #[msg("Platform fee exceeds maximum allowed (5%)")]
+    // ---- platform config -------------------------------------------------
+
+    #[msg("platform fee bps exceeds MAX_PLATFORM_FEE_BPS")]
     PlatformFeeTooHigh,
 
-    #[msg("Seeker fee must not exceed the standard platform fee")]
+    #[msg("seeker_fee_bps must not exceed fee_bps")]
     SeekerFeeExceedsStandardFee,
 
-    #[msg("Platform is already initialized")]
-    PlatformAlreadyInitialized,
+    #[msg("approval_window_seconds out of allowed range")]
+    ApprovalWindowOutOfRange,
 
-    // ==================== USER ERRORS ====================
-    
-    #[msg("User account already exists")]
-    UserAccountAlreadyExists,
+    #[msg("grace_period_seconds out of allowed range")]
+    GracePeriodOutOfRange,
 
-    #[msg("User has already received gas subsidy")]
-    AlreadyReceivedAirdrop,
+    #[msg("caller is not the protocol admin")]
+    NotProtocolAdmin,
 
-    #[msg("Airdrop amount exceeds maximum allowed")]
-    AirdropAmountTooHigh,
+    #[msg("caller is not the dispute admin")]
+    NotDisputeAdmin,
 
-    #[msg("Insufficient balance to withdraw")]
-    InsufficientBalance,
+    // ---- escrow validation ----------------------------------------------
 
-    #[msg("Must complete at least 1 gig to unlock airdrop")]
-    AirdropStillLocked,
+    #[msg("amount below MIN_ESCROW_AMOUNT")]
+    AmountTooLow,
 
-    #[msg("User account does not exist")]
-    UserAccountNotFound,
+    #[msg("completion_duration_seconds out of allowed range")]
+    CompletionDurationOutOfRange,
 
-    #[msg("Batch must contain at least one recipient")]
-    EmptyBatch,
+    #[msg("accept_deadline must be in the future")]
+    AcceptDeadlineInPast,
 
-    #[msg("Remaining accounts length must equal 2 × number of amounts")]
-    InvalidBatchLength,
+    #[msg("invalid asset for this instruction (SOL escrow expects system_program; SPL expects mint)")]
+    InvalidAssetForInstruction,
 
-    #[msg("User account PDA does not match expected derivation for this wallet")]
-    InvalidUserAccount,
+    #[msg("supplied mint does not match escrow.asset")]
+    MintMismatch,
 
-    #[msg("Treasury account must be a signer")]
-    TreasuryMustSign,
+    #[msg("supplied vault PDA does not match escrow")]
+    VaultMismatch,
 
-    #[msg("Account must be writable")]
-    AccountNotWritable,
+    #[msg("supplied token account does not match escrow")]
+    TokenAccountMismatch,
 
-    #[msg("System program account is invalid")]
-    InvalidSystemProgram,
+    #[msg("supplied treasury account does not match platform state")]
+    TreasuryMismatch,
 
-    #[msg("Treasury has insufficient balance for this batch")]
-    InsufficientTreasuryBalance,
+    // ---- state machine --------------------------------------------------
 
-    #[msg("Recipient wallet must be a system-owned account")]
-    InvalidRecipient,
+    #[msg("escrow status disallows this operation")]
+    InvalidEscrowStatus,
 
-    // ==================== ESCROW ERRORS ====================
-    
-    #[msg("Payment amount below minimum")]
-    PaymentTooLow,
+    #[msg("caller is not the escrow creator")]
+    NotCreator,
 
-    #[msg("Deadline must be in the future")]
-    InvalidDeadline,
+    #[msg("caller is not the escrow counterparty")]
+    NotCounterparty,
 
-    #[msg("Accept deadline has passed")]
+    #[msg("creator cannot accept their own escrow")]
+    CreatorCannotAccept,
+
+    #[msg("escrow has an assigned counterparty; only that wallet may accept")]
+    NotAssignedCounterparty,
+
+    #[msg("declineAssignedEscrow requires assigned_counterparty != null")]
+    NoAssignedCounterparty,
+
+    #[msg("accept_deadline has passed")]
     AcceptDeadlinePassed,
 
-    #[msg("Completion duration is below minimum allowed")]
-    DurationTooShort,
+    #[msg("accept_deadline has not yet passed (refundExpired requires expiry)")]
+    AcceptDeadlineNotPassed,
 
-    #[msg("Completion duration exceeds maximum allowed")]
-    DurationTooLong,
+    #[msg("submission window has closed (completion_deadline + grace_period_seconds elapsed)")]
+    SubmissionWindowClosed,
 
-    #[msg("Gig ID is too long")]
-    GigIdTooLong,
+    #[msg("approval_deadline has not yet passed; counterparty cannot claim stalled")]
+    ApprovalDeadlineNotPassed,
 
-    #[msg("Insufficient funds for escrow deposit")]
-    InsufficientFunds,
+    #[msg("reclaim requires completion_deadline + grace_period_seconds to have elapsed")]
+    ReclaimWindowNotOpen,
 
-    #[msg("Invalid gig status for this operation")]
-    InvalidGigStatus,
+    // ---- dispute --------------------------------------------------------
 
-    #[msg("Caller is not the poster")]
-    NotPoster,
+    #[msg("caller is not creator or counterparty (dispute only by parties)")]
+    NotDisputeParty,
 
-    #[msg("Caller is not the worker")]
-    NotWorker,
+    #[msg("escrow has no counterparty yet (cannot dispute Open status)")]
+    NoCounterpartyForDispute,
 
-    #[msg("Cannot accept own gig")]
-    CannotAcceptOwnGig,
+    #[msg("supplied dispute bond does not match escrow.dispute_bond")]
+    DisputeBondMismatch,
 
-    #[msg("Gig is not open for acceptance")]
-    GigNotOpen,
+    // ---- arithmetic -----------------------------------------------------
 
-    #[msg("Gig has not been accepted yet")]
-    GigNotAccepted,
-
-    #[msg("Proof has not been submitted")]
-    ProofNotSubmitted,
-
-    #[msg("Gig has not expired yet")]
-    GigNotExpired,
-
-    #[msg("Cannot refund gig with submitted proof")]
-    CannotRefundWithProof,
-
-    #[msg("Submission deadline has passed")]
-    SubmissionDeadlinePassed,
-
-    // ==================== DISPUTE ERRORS ====================
-    
-    #[msg("Dispute reason is too long")]
-    DisputeReasonTooLong,
-
-    #[msg("Cannot dispute gig in current status")]
-    CannotDispute,
-
-    #[msg("Caller is not authorized to dispute")]
-    NotAuthorizedToDispute,
-
-    #[msg("Gig is not disputed")]
-    GigNotDisputed,
-
-    #[msg("Caller is not admin")]
-    NotAdmin,
-
-    // ==================== ARITHMETIC ERRORS ====================
-    
-    #[msg("Arithmetic overflow")]
+    #[msg("arithmetic overflow")]
     ArithmeticOverflow,
 
-    #[msg("Arithmetic underflow")]
+    #[msg("arithmetic underflow")]
     ArithmeticUnderflow,
+
+    // ---- vault accounting ----------------------------------------------
+
+    #[msg("escrow vault balance is below the amount being settled")]
+    VaultUnderfunded,
+
+    #[msg("SOL escrow amount below the vault rent-exempt minimum")]
+    AmountBelowVaultRentMinimum,
 }

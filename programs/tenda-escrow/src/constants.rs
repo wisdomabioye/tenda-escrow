@@ -1,55 +1,62 @@
 use anchor_lang::prelude::*;
 
-// ==================== SEEDS ====================
+// ============================================================================
+// PDA seeds
+// ============================================================================
 
+/// PlatformState PDA: seeds = [PLATFORM_SEED].
 #[constant]
 pub const PLATFORM_SEED: &[u8] = b"platform";
 
-#[constant]
-pub const USER_SEED: &[u8] = b"user";
-
+/// Escrow data PDA: seeds = [ESCROW_SEED, escrow_id].
 #[constant]
 pub const ESCROW_SEED: &[u8] = b"escrow";
 
-// ==================== LIMITS ====================
+/// Per-escrow SOL vault PDA (system-owned): seeds = [ESCROW_VAULT_SEED, escrow_id].
+/// Holds lamports for native-SOL escrows. Separate from the data PDA so
+/// rent-exempt lamports never mingle with the escrowed amount + bond — a
+/// standard footgun the two-vault layout eliminates.
+#[constant]
+pub const ESCROW_VAULT_SEED: &[u8] = b"escrow_vault";
 
-/// Minimum gig payment (0.001 SOL = 1,000,000 lamports)
-pub const MIN_PAYMENT: u64 = 1_000_000;
+/// Per-escrow SPL token ATA-equivalent PDA: seeds = [ESCROW_TOKEN_SEED, escrow_id].
+/// Holds SPL token balance for token escrows. Owned by Token Program; the
+/// authority is the Escrow data PDA so settlement instructions sign as that PDA.
+#[constant]
+pub const ESCROW_TOKEN_SEED: &[u8] = b"escrow_token";
 
-/// Maximum platform fee (5% = 500 basis points)
-pub const MAX_PLATFORM_FEE_BPS: u16 = 500;
+// ============================================================================
+// Limits (validated on-chain; server enforces tighter bounds where appropriate)
+// ============================================================================
 
-/// Default Seeker fee discount (1% = 100 basis points)
-pub const DEFAULT_SEEKER_FEE_BPS: u16 = 100;
+/// Hard ceiling on platform fee. 1000 bps = 10%. Anything beyond is presumed
+/// configuration error and rejected at `initializePlatform` / `setFeeBps`.
+pub const MAX_PLATFORM_FEE_BPS: u16 = 1_000;
 
-/// Maximum airdrop amount (0.01 SOL = 10,000,000 lamports)
-pub const MAX_AIRDROP: u64 = 10_000_000;
+/// Minimum `approval_window_seconds` accepted by `setApprovalWindow`.
+/// 1 hour — keeps creators from accidentally setting a zero-window that makes
+/// every submission instantly claimable by counterparty.
+pub const MIN_APPROVAL_WINDOW_SECONDS: i64 = 3_600;
 
-/// Default gas subsidy (0.005 SOL = 5,000,000 lamports)
-pub const DEFAULT_GAS_SUBSIDY: u64 = 5_000_000;
+/// Maximum `approval_window_seconds`. 30 days — beyond this, counterparty
+/// payments stall indefinitely; tune via `setApprovalWindow` if needed.
+pub const MAX_APPROVAL_WINDOW_SECONDS: i64 = 30 * 24 * 3_600;
 
-/// Default grace period (24 hours = 86400 seconds)
-pub const DEFAULT_GRACE_PERIOD: i64 = 86_400;
+/// Minimum `grace_period_seconds`. 0 means submit cuts off exactly at
+/// `completion_deadline`; allowed but discouraged.
+pub const MIN_GRACE_PERIOD_SECONDS: i64 = 0;
 
-/// Maximum gig ID length (UUID without hyphens — 32 hex chars = 32 bytes, fits Solana seed limit)
-pub const MAX_GIG_ID_LEN: usize = 32;
+/// Maximum `grace_period_seconds`. 14 days — wider grace makes `reclaimAbandoned`
+/// effectively unreachable; cap to keep the abandonment path operational.
+pub const MAX_GRACE_PERIOD_SECONDS: i64 = 14 * 24 * 3_600;
 
-/// Minimum completion duration: 1 hour in seconds
-pub const MIN_COMPLETION_DURATION_SECONDS: u64 = 3_600;
+/// Minimum completion duration (1 hour). Sub-hour gigs are a UX smell; reject.
+pub const MIN_COMPLETION_DURATION_SECONDS: i64 = 3_600;
 
-/// Maximum completion duration: 90 days in seconds
-pub const MAX_COMPLETION_DURATION_SECONDS: u64 = 90 * 24 * 3_600;
+/// Maximum completion duration (180 days). Beyond half a year, escrow is a poor
+/// fit for the workflow — use staged sub-escrows.
+pub const MAX_COMPLETION_DURATION_SECONDS: i64 = 180 * 24 * 3_600;
 
-/// Maximum dispute reason length
-pub const MAX_DISPUTE_REASON_LEN: usize = 1000;
-
-// ==================== ACCOUNT SIZES ====================
-
-/// PlatformState account size
-/// 8 (discriminator) + 32 (admin) + 2 (fee_bps) + 2 (seeker_fee_bps) + 32 (treasury) + 8 (total_gigs) + 8 (total_volume) + 8 (grace_period)
-pub const PLATFORM_STATE_SIZE: usize = 8 + 32 + 2 + 2 + 32 + 8 + 8 + 8;
-
-/// UserAccount size
-/// 8 (discriminator) + 32 (wallet) + 8 (airdrop_sol) + 8 (earned_sol) + 4 (completed_gigs) + 1 (phone_verified) + 8 (created_at)
-pub const USER_ACCOUNT_SIZE: usize = 8 + 32 + 8 + 8 + 4 + 1 + 8;
-
+/// Minimum escrow amount (1 lamport / 1 token unit). Zero-amount escrows are
+/// always rejected because every settlement path assumes positive transfer.
+pub const MIN_ESCROW_AMOUNT: u64 = 1;

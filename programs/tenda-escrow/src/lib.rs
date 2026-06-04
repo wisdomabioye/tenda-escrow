@@ -1,3 +1,14 @@
+//! Tenda single-escrow primitive — Solana program.
+//!
+//! Rewritten in Stage 0 (foundation.md § Solana contract rewrite) to mirror
+//! the future Solidity surface 1:1. No UserAccount, no airdrop, no
+//! withdraw_earnings — every legacy concept that did not survive the
+//! schema-v2 collapse is gone.
+//!
+//! Event emission uses `emit!` (program-log encoding) for Stage 0. The
+//! foundation spec calls for `emit_cpi!`; switching is a focused single-PR
+//! change deferred until log-truncation becomes a real concern.
+
 use anchor_lang::prelude::*;
 
 pub mod constants;
@@ -5,9 +16,45 @@ pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod state;
-pub mod utils;
 
-use instructions::*;
+// Bring `#[derive(Accounts)]` types + the auto-generated
+// `__client_accounts_<name>` macro-helper modules into the crate root.
+// Anchor's `#[program]` macro resolves these by crate-root path so the
+// glob has to walk all the way to the leaf module where the struct lives.
+// `#[allow(ambiguous_glob_reexports)]` is needed because multiple submodules
+// expose handlers named `handler` / `handler_sol` / `handler_spl`; the
+// program surface never names them via this re-export (it uses fully
+// qualified paths), so the ambiguity is benign for our purposes.
+#[allow(ambiguous_glob_reexports, unused_imports)]
+mod _anchor_reexports {
+    pub use crate::instructions::admin::initialize_platform::*;
+    pub use crate::instructions::admin::set_approval_window::*;
+    pub use crate::instructions::admin::set_dispute_admin::*;
+    pub use crate::instructions::admin::set_fee_bps::*;
+    pub use crate::instructions::admin::set_grace_period::*;
+    pub use crate::instructions::admin::set_protocol_admin::*;
+    pub use crate::instructions::admin::set_treasury::*;
+    // AdminUpdate lives in instructions::admin::mod.rs alongside its
+    // generated `__client_accounts_admin_update` module — pull the parent
+    // glob, not the struct alone.
+    pub use crate::instructions::admin::*;
+    pub use crate::instructions::dispute::raise::*;
+    pub use crate::instructions::dispute::resolve::*;
+    pub use crate::instructions::escrow_create::cancel::*;
+    pub use crate::instructions::escrow_create::create_sol::*;
+    pub use crate::instructions::escrow_create::create_spl::*;
+    pub use crate::instructions::escrow_create::refund_expired::*;
+    pub use crate::instructions::escrow_create::shared::CreateEscrowArgs;
+    pub use crate::instructions::escrow_state::accept::*;
+    pub use crate::instructions::escrow_state::approve::*;
+    pub use crate::instructions::escrow_state::claim_stalled::*;
+    pub use crate::instructions::escrow_state::decline::*;
+    pub use crate::instructions::escrow_state::reclaim::*;
+    pub use crate::instructions::escrow_state::settlement_accounts::*;
+    pub use crate::instructions::escrow_state::submit::*;
+}
+pub use _anchor_reexports::*;
+use state::DisputeWinner;
 
 declare_id!("7H6AAoghUCPAVA1WTEwpSmkiRfPHWrgFidZQPzbXzkes");
 
@@ -15,100 +62,136 @@ declare_id!("7H6AAoghUCPAVA1WTEwpSmkiRfPHWrgFidZQPzbXzkes");
 pub mod tenda_escrow {
     use super::*;
 
-    // ==================== PLATFORM INITIALIZATION ====================
-    
+    // ---- admin -----------------------------------------------------------
+
     pub fn initialize_platform(
         ctx: Context<InitializePlatform>,
-        platform_fee_bps: u16,
+        args: InitializePlatformArgs,
+    ) -> Result<()> {
+        initialize_platform_handler(ctx, args)
+    }
+
+    pub fn set_protocol_admin(ctx: Context<AdminUpdate>, new_admin: Pubkey) -> Result<()> {
+        set_protocol_admin_handler(ctx, new_admin)
+    }
+
+    pub fn set_dispute_admin(ctx: Context<AdminUpdate>, new_admin: Pubkey) -> Result<()> {
+        set_dispute_admin_handler(ctx, new_admin)
+    }
+
+    pub fn set_treasury(ctx: Context<AdminUpdate>, new_treasury: Pubkey) -> Result<()> {
+        set_treasury_handler(ctx, new_treasury)
+    }
+
+    pub fn set_fee_bps(
+        ctx: Context<AdminUpdate>,
+        fee_bps: u16,
         seeker_fee_bps: u16,
-        grace_period_seconds: i64,
     ) -> Result<()> {
-        instructions::initialize::handler(ctx, platform_fee_bps, seeker_fee_bps, grace_period_seconds)
+        set_fee_bps_handler(ctx, fee_bps, seeker_fee_bps)
     }
 
-    // ==================== USER MANAGEMENT ====================
-    
-    pub fn create_user_account(ctx: Context<CreateUserAccount>) -> Result<()> {
-        instructions::user::create_user_account::handler(ctx)
+    pub fn set_approval_window(ctx: Context<AdminUpdate>, seconds: i64) -> Result<()> {
+        set_approval_window_handler(ctx, seconds)
     }
 
-    pub fn airdrop_gas_subsidy(
-        ctx: Context<AirdropGasSubsidy>,
-        amount: u64,
+    pub fn set_grace_period(ctx: Context<AdminUpdate>, seconds: i64) -> Result<()> {
+        set_grace_period_handler(ctx, seconds)
+    }
+
+    // ---- escrow_create ---------------------------------------------------
+
+    pub fn create_escrow_sol(
+        ctx: Context<CreateEscrowSol>,
+        args: CreateEscrowArgs,
     ) -> Result<()> {
-        instructions::user::airdrop_gas_subsidy::handler(ctx, amount)
+        instructions::escrow_create::create_sol::handler(ctx, args)
     }
 
-    /// Distribute gas-subsidy airdrops to multiple recipients in a single transaction.
-    /// remaining_accounts layout: [treasury, system_program, pda_0, wallet_0, ..., pda_n, wallet_n].
-    /// `amounts[i]` maps to the [pda_i, wallet_i] pair at index 2+i*2.
-    pub fn batch_airdrop_gas_subsidy(
-        ctx: Context<BatchAirdropGasSubsidy>,
-        amounts: Vec<u64>,
+    pub fn create_escrow_spl(
+        ctx: Context<CreateEscrowSpl>,
+        args: CreateEscrowArgs,
     ) -> Result<()> {
-        instructions::user::batch_airdrop_gas_subsidy::handler(ctx, amounts)
+        instructions::escrow_create::create_spl::handler(ctx, args)
     }
 
-    pub fn withdraw_earnings(
-        ctx: Context<WithdrawEarnings>,
-        amount: u64,
-    ) -> Result<()> {
-        instructions::user::withdraw_earnings::handler(ctx, amount)
+    pub fn cancel_escrow_sol(ctx: Context<CancelSol>) -> Result<()> {
+        instructions::escrow_create::cancel::handler_sol(ctx)
     }
 
-    // ==================== ESCROW LIFECYCLE ====================
-    
-    pub fn create_gig_escrow(
-        ctx: Context<CreateGigEscrow>,
-        gig_id: String,
-        payment_amount: u64,
-        completion_duration_seconds: u64,
-        accept_deadline: Option<i64>,
-        is_seeker: bool,
-    ) -> Result<()> {
-        instructions::escrow::create_gig_escrow::handler(
-            ctx,
-            gig_id,
-            payment_amount,
-            completion_duration_seconds,
-            accept_deadline,
-            is_seeker,
-        )
+    pub fn cancel_escrow_spl(ctx: Context<CancelSpl>) -> Result<()> {
+        instructions::escrow_create::cancel::handler_spl(ctx)
     }
 
-    pub fn cancel_gig(ctx: Context<CancelGig>) -> Result<()> {
-        instructions::escrow::cancel_gig::handler(ctx)
+    pub fn refund_expired_sol(ctx: Context<CancelSol>) -> Result<()> {
+        instructions::escrow_create::refund_expired::handler_sol(ctx)
     }
 
-    pub fn accept_gig(ctx: Context<AcceptGig>) -> Result<()> {
-        instructions::escrow::accept_gig::handler(ctx)
+    pub fn refund_expired_spl(ctx: Context<CancelSpl>) -> Result<()> {
+        instructions::escrow_create::refund_expired::handler_spl(ctx)
     }
 
-    pub fn submit_proof(ctx: Context<SubmitProof>) -> Result<()> {
-        instructions::escrow::submit_proof::handler(ctx)
+    // ---- escrow_state ----------------------------------------------------
+
+    pub fn accept_escrow(ctx: Context<EscrowMutation>) -> Result<()> {
+        instructions::escrow_state::accept::handler(ctx)
     }
 
-    pub fn approve_completion(ctx: Context<ApproveCompletion>) -> Result<()> {
-        instructions::escrow::approve_completion::handler(ctx)
+    pub fn decline_assigned_escrow(ctx: Context<EscrowMutation>) -> Result<()> {
+        instructions::escrow_state::decline::handler(ctx)
     }
 
-    pub fn refund_expired(ctx: Context<RefundExpired>) -> Result<()> {
-        instructions::escrow::refund_expired::handler(ctx)
+    pub fn submit_proof(ctx: Context<EscrowMutation>, proof_hash: [u8; 32]) -> Result<()> {
+        instructions::escrow_state::submit::handler(ctx, proof_hash)
     }
 
-    // ==================== DISPUTE HANDLING ====================
-    
-    pub fn dispute_gig(
-        ctx: Context<DisputeGig>,
-        reason: String,
-    ) -> Result<()> {
-        instructions::dispute::dispute_gig::handler(ctx, reason)
+    pub fn approve_completion_sol(ctx: Context<SettleSol>) -> Result<()> {
+        instructions::escrow_state::approve::handler_sol(ctx)
     }
 
-    pub fn resolve_dispute(
-        ctx: Context<ResolveDispute>,
+    pub fn approve_completion_spl(ctx: Context<SettleSpl>) -> Result<()> {
+        instructions::escrow_state::approve::handler_spl(ctx)
+    }
+
+    pub fn claim_stalled_payment_sol(ctx: Context<SettleSol>) -> Result<()> {
+        instructions::escrow_state::claim_stalled::handler_sol(ctx)
+    }
+
+    pub fn claim_stalled_payment_spl(ctx: Context<SettleSpl>) -> Result<()> {
+        instructions::escrow_state::claim_stalled::handler_spl(ctx)
+    }
+
+    pub fn reclaim_abandoned_sol(ctx: Context<SettleSol>) -> Result<()> {
+        instructions::escrow_state::reclaim::handler_sol(ctx)
+    }
+
+    pub fn reclaim_abandoned_spl(ctx: Context<SettleSpl>) -> Result<()> {
+        instructions::escrow_state::reclaim::handler_spl(ctx)
+    }
+
+    // ---- dispute ---------------------------------------------------------
+
+    pub fn dispute_escrow_sol(ctx: Context<DisputeSol>, bond_amount: u64) -> Result<()> {
+        instructions::dispute::raise::handler_sol(ctx, bond_amount)
+    }
+
+    pub fn dispute_escrow_spl(ctx: Context<DisputeSpl>, bond_amount: u64) -> Result<()> {
+        instructions::dispute::raise::handler_spl(ctx, bond_amount)
+    }
+
+    pub fn resolve_dispute_sol(
+        ctx: Context<ResolveSol>,
         winner: DisputeWinner,
+        raiser: Pubkey,
     ) -> Result<()> {
-        instructions::dispute::resolve_dispute::handler(ctx, winner)
+        instructions::dispute::resolve::handler_sol(ctx, winner, raiser)
+    }
+
+    pub fn resolve_dispute_spl(
+        ctx: Context<ResolveSpl>,
+        winner: DisputeWinner,
+        raiser: Pubkey,
+    ) -> Result<()> {
+        instructions::dispute::resolve::handler_spl(ctx, winner, raiser)
     }
 }
